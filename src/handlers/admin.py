@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 
 from aiogram import Router, F
@@ -147,8 +148,18 @@ async def process_welcome_callback(query: CallbackQuery, state: FSMContext):
 
     await state.clear()
 
+    welcome_templates = [
+        "✨ У нас отличная новость! ✨\nСегодня к нам присоединился <b>{name}</b>, и мы рады поприветствовать его в нашей команде 🙌\n\nЖелаем лёгкого старта, ярких идей и энергии для новых свершений 🚀\nПусть работа приносит удовольствие, а команда всегда будет опорой и поддержкой 💡🤝",
+        "🎉 Команда стала больше и сильнее! 🎉\nСегодня к нам присоединился <b>{name}</b> — давайте вместе пожелаем успешного старта ✨\nПусть впереди ждут интересные проекты, вдохновение и классные победы.\nМы уверены: вместе у нас получится ещё больше 💪🚀",
+        "🔥 Отличные новости! 🔥\nК нам присоединился новый коллега — <b>{name}</b>. Добро пожаловать в команду!\nЖелаем тебе быстрого вхождения в ритм, лёгких решений и настоящего удовольствия от работы 🌟\nА мы всегда рядом, чтобы поддержать и помочь 🙌",
+        "🎉 Друзья, у нас пополнение! 🎉\nСегодня к нашей команде присоединился <b>{name}</b>. Добро пожаловать на борт 🚀\nПусть работа здесь будет не только про задачи и дедлайны, но и про вдохновение, новые идеи и дружескую атмосферу. Желаем лёгкого старта, быстрых побед и ощущения, что ты «в своей команде» с первого дня 🙌\nМы всегда рядом, поддержим и поможем — вместе у нас всё получится 💡✨"
+    ]
+
     if query.data == "welcome_yes":
-        text = f"🎉 Добро пожаловать в команду, <b>{data['name']}</b>! 💼 {data['telegram'] if data.get('telegram') else ''}"
+        text = random.choice(welcome_templates).format(name=data['name'])
+        if data.get('telegram'):
+            text += f" 💼 {data['telegram']}"
+
         if data.get("photo"):
             photo_path = PHOTOS_DIR / data["photo"]
             photo_file = FSInputFile(path=str(photo_path))
@@ -418,7 +429,6 @@ async def process_search_employee(message: Message, state: FSMContext):
         )
         caption = f"<b>{emp['name']}</b>\n🎂 {emp['birthday']}   💼 {emp['telegram']}\n🆔 ID: <code>{emp['id']}</code>"
 
-        # Отправляем фото, если есть
         if emp.get("photo"):
             from aiogram.types import FSInputFile
             from pathlib import Path
@@ -466,18 +476,23 @@ async def process_congrats_text(message: Message, state: FSMContext):
     data = await state.get_data()
     emp_id = data.get("congrats_emp_id")
     emp = storage.get_by_id(emp_id)
-    chat_id = load_chat_id()  # общий чат
+    chat_id = load_chat_id()
 
     text = message.text.strip()
+    final_text = f"{emp['name']}, {text}"
+    print(final_text)
+    if emp.get("telegram"):
+        final_text += f" {emp['telegram']}"
+
     if emp.get("photo"):
         from aiogram.types import FSInputFile
         from pathlib import Path
         PHOTOS_DIR = Path(__file__).parent.parent / "photos"
         photo_path = PHOTOS_DIR / emp["photo"]
         photo_file = FSInputFile(path=str(photo_path))
-        await message.bot.send_photo(chat_id=chat_id, photo=photo_file, caption=text)
+        await message.bot.send_photo(chat_id=chat_id, photo=photo_file, caption=final_text)
     else:
-        await message.bot.send_message(chat_id=chat_id, text=text)
+        await message.bot.send_message(chat_id=chat_id, text=final_text)
 
     await message.answer("✅ Поздравление отправлено!")
     await state.clear()
