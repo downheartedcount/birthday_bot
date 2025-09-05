@@ -1,0 +1,13 @@
+services:
+  birthday_bot:
+    build: .
+    container_name: birthday_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./src/photos:/app/src/photos
+      - ./src/employees.json:/app/src/employees.json
+      - ./src/hr.json:/app/src/hr.json
+      - ./src/greetings.json:/app/src/greetings.json
+    tty: true
