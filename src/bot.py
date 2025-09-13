@@ -40,7 +40,6 @@ async def send_daily_birthdays():
     employees_today = storage.get_today_birthdays()
 
     if not employees_today:
-        await bot.send_message(chat_id, "🎂 Сегодня именинников нет.")
         return
 
     for emp in employees_today:

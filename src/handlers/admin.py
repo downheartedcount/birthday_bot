@@ -22,15 +22,11 @@ class AddEmployee(StatesGroup):
     name = State()
     birthday = State()
     telegram = State()
+    position = State()
+    gender = State()
     photo = State()
     welcome_confirm = State()
 
-
-class EditEmployeeStates(StatesGroup):
-    name = State()
-    birthday = State()
-    telegram = State()
-    photo = State()
 
 class CongratsEmployee(StatesGroup):
     waiting_text = State()
@@ -38,7 +34,9 @@ class CongratsEmployee(StatesGroup):
 CANCEL_STATES = [
     AddEmployee.name.state,
     AddEmployee.birthday.state,
+    AddEmployee.position.state,
     AddEmployee.telegram.state,
+    AddEmployee.gender.state,
     AddEmployee.photo.state
 ]
 
@@ -78,6 +76,18 @@ async def process_birthday(message: Message, state: FSMContext):
         await message.answer("Неверный формат. Пример: 1995-09-10. Попробуйте ещё раз:")
         return
     await state.update_data(birthday=text)
+    await state.set_state(AddEmployee.position)
+    await message.answer("Введите должность сотрудника сотрудника", reply_markup=cancel_kb)
+
+@router.message(F.chat.type == "private",AddEmployee.position, F.text)
+async def process_position(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        await message.answer("⛔ Действие отменено.", reply_markup=ReplyKeyboardRemove())
+        return
+    text = message.text.strip()
+
+    await state.update_data(position=text)
     await state.set_state(AddEmployee.telegram)
     await message.answer("Введите Telegram аккаунт сотрудника (например, @username):", reply_markup=cancel_kb)
 
@@ -94,8 +104,22 @@ async def process_telegram(message: Message, state: FSMContext):
         await message.answer("Telegram аккаунт должен начинаться с @. Попробуйте снова:")
         return
     await state.update_data(telegram=text)
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👨 Мужчина", callback_data="gender_male"),
+                InlineKeyboardButton(text="👩 Женщина", callback_data="gender_female"),
+            ]
+        ]
+    )
+    await message.answer("Выберите пол сотрудника:", reply_markup=kb)
+
+@router.callback_query(lambda c: c.data in ["gender_male", "gender_female"])
+async def process_gender(query: CallbackQuery, state: FSMContext):
+    gender = "male" if query.data == "gender_male" else "female"
+    await state.update_data(gender=gender)
     await state.set_state(AddEmployee.photo)
-    await message.answer("Пришлите фотографию сотрудника (как фото, не как файл):", reply_markup=cancel_kb)
+    await query.message.edit_text("Теперь пришлите фотографию сотрудника (как фото, не как файл):")
 
 
 @router.message(F.chat.type == "private",AddEmployee.photo, F.photo)
@@ -115,6 +139,8 @@ async def process_photo(message: Message, state: FSMContext):
         name=data["name"],
         birthday=data["birthday"],
         telegram=data["telegram"],
+        position=data['position'],
+        gender=data['gender'],
         photo_filename=filename
     )
     await state.update_data(photo=filename)
@@ -149,14 +175,21 @@ async def process_welcome_callback(query: CallbackQuery, state: FSMContext):
     await state.clear()
 
     welcome_templates = [
-        "✨ У нас отличная новость! ✨\nСегодня к нам присоединился <b>{name}</b>, и мы рады поприветствовать его в нашей команде 🙌\n\nЖелаем лёгкого старта, ярких идей и энергии для новых свершений 🚀\nПусть работа приносит удовольствие, а команда всегда будет опорой и поддержкой 💡🤝",
-        "🎉 Команда стала больше и сильнее! 🎉\nСегодня к нам присоединился <b>{name}</b> — давайте вместе пожелаем успешного старта ✨\nПусть впереди ждут интересные проекты, вдохновение и классные победы.\nМы уверены: вместе у нас получится ещё больше 💪🚀",
-        "🔥 Отличные новости! 🔥\nК нам присоединился новый коллега — <b>{name}</b>. Добро пожаловать в команду!\nЖелаем тебе быстрого вхождения в ритм, лёгких решений и настоящего удовольствия от работы 🌟\nА мы всегда рядом, чтобы поддержать и помочь 🙌",
-        "🎉 Друзья, у нас пополнение! 🎉\nСегодня к нашей команде присоединился <b>{name}</b>. Добро пожаловать на борт 🚀\nПусть работа здесь будет не только про задачи и дедлайны, но и про вдохновение, новые идеи и дружескую атмосферу. Желаем лёгкого старта, быстрых побед и ощущения, что ты «в своей команде» с первого дня 🙌\nМы всегда рядом, поддержим и поможем — вместе у нас всё получится 💡✨"
+        "✨ У нас отличная новость! ✨\nСегодня к нам {joined} <b>{name}</b>, {position} 🙌\n\nЖелаем лёгкого старта...",
+        "🎉 Команда стала больше и сильнее! 🎉\nСегодня к нам {joined} <b>{name}</b>, {position} ✨\nПусть впереди ждут...",
+        "🔥 Отличные новости! 🔥\nК нам {joined} новый коллега — <b>{name}</b>, {position}. Добро пожаловать!",
+        "🎉 Друзья, у нас пополнение! 🎉\nСегодня к нашей команде {joined} <b>{name}</b>, {position}. Добро пожаловать 🚀"
     ]
 
     if query.data == "welcome_yes":
-        text = random.choice(welcome_templates).format(name=data['name'])
+        gender = data.get("gender", "male")
+        joined_word = "присоединился" if gender == "male" else "присоединилась"
+
+        text = random.choice(welcome_templates).format(
+            name=data['name'],
+            position=data['position'],
+            joined=joined_word
+        )
         if data.get('telegram'):
             text += f" 💼 {data['telegram']}"
 
@@ -195,11 +228,19 @@ async def list_employees(message: Message):
 
     text = "👥 <b>Список сотрудников</b>:\n\n"
     for idx, emp in enumerate(employees, start=1):
-        text += (
-            f"{idx}. <b>{emp['name']}</b>\n"
-            f"🎂 {emp['birthday']}   💼 {emp['telegram']}\n"
-            f"🆔 ID: <code>{emp['id']}</code>\n\n"
-        )
+        if emp.get('position'):
+            text += (
+                f"{idx}. <b>{emp['name']}</b> - {emp['position']}\n"
+                f"🎂 {emp['birthday']}   💼 {emp['telegram']}\n"
+                f"🆔 ID: <code>{emp['id']}</code>\n\n"
+            )
+        else:
+            text += (
+                f"{idx}. <b>{emp['name']}</b>\n"
+                f"🎂 {emp['birthday']}   💼 {emp['telegram']}\n"
+                f"🆔 ID: <code>{emp['id']}</code>\n\n"
+            )
+
 
     await message.answer(text)
 

@@ -27,13 +27,15 @@ class StorageService:
         with open(self.filename, "w", encoding="utf-8") as f:
             json.dump(employees, f, ensure_ascii=False, indent=2)
 
-    def add_employee(self, name, birthday, telegram, photo_filename):
+    def add_employee(self, name, birthday, position, telegram, gender, photo_filename):
         employees = self.load()
         employees.append({
             "id": str(uuid.uuid4()),
             "name": name,
             "birthday": birthday,
+            "position": position,
             "telegram": telegram,
+            "gender": gender,
             "photo": str(photo_filename)
         })
         self.save(employees)
