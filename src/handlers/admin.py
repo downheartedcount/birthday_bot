@@ -176,8 +176,8 @@ async def process_welcome_callback(query: CallbackQuery, state: FSMContext):
 
     welcome_templates = [
         "✨ У нас отличная новость! ✨\nСегодня к нам {joined} <b>{name}</b>, {position} 🙌\n\nЖелаем лёгкого старта...",
-        "🎉 Команда стала больше и сильнее! 🎉\nСегодня к нам {joined} <b>{name}</b>, {position} ✨\nПусть впереди ждут...",
-        "🔥 Отличные новости! 🔥\nК нам {joined} новый коллега — <b>{name}</b>, {position}. Добро пожаловать!",
+        "🎉 Команда стала больше и сильнее! 🎉\nСегодня к нам {joined} <b>{name}</b>, {position} ✨\nПусть впереди ждут только победы!",
+        "🔥 Отличные новости! 🔥\nК нам {joined} коллега — <b>{name}</b>, {position}. Добро пожаловать!",
         "🎉 Друзья, у нас пополнение! 🎉\nСегодня к нашей команде {joined} <b>{name}</b>, {position}. Добро пожаловать 🚀"
     ]
 
