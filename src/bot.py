@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
@@ -58,6 +60,31 @@ async def send_daily_birthdays():
             await bot.send_message(chat_id, greeting)
 
 
+async def send_monthly_birthdays():
+    chat_id = load_chat_id()
+    if not chat_id:
+        return
+
+    storage = StorageService()
+    all_employees = storage.get_all()
+
+    current_month = datetime.now().month
+    month_birthdays = [
+        emp for emp in all_employees
+        if datetime.strptime(emp["birthday"], "%Y-%m-%d").month == current_month
+    ]
+
+    if not month_birthdays:
+        return await bot.send_message(chat_id, "🎂 В этом месяце нет именинников.")
+
+    text = f"🎉 <b>Именинники в этом месяце:</b>\n\n"
+
+    for emp in month_birthdays:
+        text += f"🎂 <b>{emp['name']}</b> — {emp['birthday']} ({emp['telegram']})\n"
+
+    await bot.send_message(chat_id, text)
+
+
 async def main():
 
     setup_routers()
@@ -69,6 +96,13 @@ async def main():
         minute=settings.MINUTE
     )
 
+    scheduler.add_job(
+        send_monthly_birthdays,
+        "cron",
+        day=1,
+        hour=settings.HOUR,
+        minute=settings.MINUTE,
+    )
 
     scheduler.start()
 

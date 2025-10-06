@@ -82,6 +82,18 @@ class StorageService:
                 return emp
         return None
 
+    def get_birthdays_in_month(self, month: int):
+        employees = self.get_all()
+        result = []
+        for emp in employees:
+            try:
+                emp_month = int(emp["birthday"].split("-")[1])
+                if emp_month == month:
+                    result.append(emp)
+            except Exception:
+                continue
+        return result
+
 async def save_photo(bot: Bot, file_id: str, filename: str):
     file = await bot.get_file(file_id)
     dst = PHOTOS_DIR / filename
