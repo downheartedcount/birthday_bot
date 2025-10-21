@@ -79,7 +79,7 @@ async def process_birthday(message: Message, state: FSMContext):
     await state.set_state(AddEmployee.position)
     await message.answer("Введите должность сотрудника сотрудника", reply_markup=cancel_kb)
 
-@router.message(F.chat.type == "private",AddEmployee.position, F.text)
+@router.message(F.chat.type == "private", AddEmployee.position, F.text)
 async def process_position(message: Message, state: FSMContext):
     if message.text == "❌ Отмена":
         await state.clear()
@@ -89,9 +89,34 @@ async def process_position(message: Message, state: FSMContext):
 
     await state.update_data(position=text)
     await state.set_state(AddEmployee.telegram)
-    await message.answer("Введите Telegram аккаунт сотрудника (например, @username):", reply_markup=cancel_kb)
+
+    # Добавляем выбор "нет username"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🚫 Нет username", callback_data="no_username")]
+        ]
+    )
+
+    await message.answer(
+        "Введите Telegram аккаунт сотрудника (например, @username):\n"
+        "Или выберите, что его нет 👇",
+        reply_markup=kb
+    )
 
 
+@router.callback_query(lambda c: c.data == "no_username")
+async def process_no_username(query: CallbackQuery, state: FSMContext):
+    await state.update_data(telegram="—")  # или None
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👨 Мужчина", callback_data="gender_male"),
+                InlineKeyboardButton(text="👩 Женщина", callback_data="gender_female"),
+            ]
+        ]
+    )
+    await state.set_state(AddEmployee.gender)
+    await query.message.edit_text("Выберите пол сотрудника:", reply_markup=kb)
 
 @router.message(F.chat.type == "private",AddEmployee.telegram, F.text)
 async def process_telegram(message: Message, state: FSMContext):
@@ -119,11 +144,58 @@ async def process_gender(query: CallbackQuery, state: FSMContext):
     gender = "male" if query.data == "gender_male" else "female"
     await state.update_data(gender=gender)
     await state.set_state(AddEmployee.photo)
-    await query.message.edit_text("Теперь пришлите фотографию сотрудника (как фото, не как файл):")
+
+    # Добавляем кнопки: отправить фото или выбрать "нет фото"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🚫 Нет фото", callback_data="no_photo")]
+        ]
+    )
+
+    await query.message.edit_text(
+        "Теперь пришлите фотографию сотрудника (как фото, не как файл) 📷\n"
+        "Или выберите, что фото нет 👇",
+        reply_markup=kb
+    )
 
 
-@router.message(F.chat.type == "private",AddEmployee.photo, F.photo)
+@router.callback_query(lambda c: c.data == "no_photo")
+async def process_no_photo(query: CallbackQuery, state: FSMContext):
+    """Обработка случая, когда фото нет — ставим дефолтное"""
+    await state.update_data(photo="default.jpg")  # <-- дефолтный файл, можно заменить на ссылку
+    data = await state.get_data()
+
+    # Сохраняем сотрудника сразу
+    storage.add_employee(
+        name=data["name"],
+        birthday=data["birthday"],
+        telegram=data.get("telegram", "—"),
+        position=data["position"],
+        gender=data["gender"],
+        photo_filename="default.jpg"
+    )
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🎉 Да", callback_data="welcome_yes"),
+                InlineKeyboardButton(text="❌ Нет", callback_data="welcome_no"),
+            ]
+        ]
+    )
+
+    await query.message.edit_text(
+        f"✅ Сотрудник <b>{data['name']}</b> добавлен!\n"
+        "Хотите поздравить его с вступлением в команду?",
+        parse_mode="HTML",
+        reply_markup=kb
+    )
+    await state.set_state(AddEmployee.welcome_confirm)
+
+
+@router.message(F.chat.type == "private", AddEmployee.photo, F.photo)
 async def process_photo(message: Message, state: FSMContext):
+    """Обработка присланного фото"""
     if message.text == "❌ Отмена":
         await state.clear()
         await message.answer("⛔ Действие отменено.", reply_markup=ReplyKeyboardRemove())
@@ -139,8 +211,8 @@ async def process_photo(message: Message, state: FSMContext):
         name=data["name"],
         birthday=data["birthday"],
         telegram=data["telegram"],
-        position=data['position'],
-        gender=data['gender'],
+        position=data["position"],
+        gender=data["gender"],
         photo_filename=filename
     )
     await state.update_data(photo=filename)
@@ -160,6 +232,7 @@ async def process_photo(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
     await state.set_state(AddEmployee.welcome_confirm)
+
 
 @router.callback_query(lambda c: c.data in ["welcome_yes", "welcome_no"])
 async def process_welcome_callback(query: CallbackQuery, state: FSMContext):
